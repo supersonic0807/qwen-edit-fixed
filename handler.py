@@ -133,6 +133,26 @@ def load_workflow(workflow_path):
     with open(workflow_path, 'r') as file:
         return json.load(file)
 
+# 새 워크플로우 파일명: 이미지 개수별
+_WORKFLOW_BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "workflow")
+_WORKFLOW_FILES = {
+    1: "qwen_image_edit_1_1image.json",
+    2: "qwen_image_edit_1_2image.json",
+    3: "qwen_image_edit_1_3image.json",
+}
+
+# 워크플로우별 노드 ID (이미지 개수에 따라 사용)
+# 1-image: LoadImage=78, KSampler(seed)=3, prompt=111
+# 2-image: 위 + LoadImage2=117
+# 3-image: 위 + LoadImage3=119
+_NODE_IMAGE_1 = "78"
+_NODE_IMAGE_2 = "117"
+_NODE_IMAGE_3 = "119"
+_NODE_SEED = "3"
+_NODE_PROMPT = "111"
+_NODE_WIDTH = "128"   # 현재 워크플로우에는 없음(선택 적용)
+_NODE_HEIGHT = "129"  # 현재 워크플로우에는 없음(선택 적용)
+
 # ------------------------------
 # 입력 처리 유틸 (path/url/base64)
 # ------------------------------
@@ -194,44 +214,55 @@ def handler(job):
     task_id = f"task_{uuid.uuid4()}"
 
     # ------------------------------
-    # 이미지 입력 수집 (1개 또는 2개)
+    # 이미지 입력 수집 (1개 / 2개 / 3개)
     # 지원 키: image_path | image_url | image_base64
     #         image_path_2 | image_url_2 | image_base64_2
+    #         image_path_3 | image_url_3 | image_base64_3
     # ------------------------------
-    image1_path = None
-    image2_path = None
+    image_paths = []
 
-    if "image_path" in job_input:
-        image1_path = process_input(job_input["image_path"], task_id, "input_image_1.jpg", "path")
-    elif "image_url" in job_input:
-        image1_path = process_input(job_input["image_url"], task_id, "input_image_1.jpg", "url")
-    elif "image_base64" in job_input:
-        image1_path = process_input(job_input["image_base64"], task_id, "input_image_1.jpg", "base64")
+    for i, suffix in enumerate([ "", "_2", "_3" ], start=1):
+        path_key = f"image_path{suffix}"
+        url_key = f"image_url{suffix}"
+        b64_key = f"image_base64{suffix}"
+        fname = f"input_image_{i}.jpg"
+        if path_key in job_input:
+            image_paths.append(process_input(job_input[path_key], task_id, fname, "path"))
+        elif url_key in job_input:
+            image_paths.append(process_input(job_input[url_key], task_id, fname, "url"))
+        elif b64_key in job_input:
+            image_paths.append(process_input(job_input[b64_key], task_id, fname, "base64"))
+        else:
+            break
 
-    if "image_path_2" in job_input:
-        image2_path = process_input(job_input["image_path_2"], task_id, "input_image_2.jpg", "path")
-    elif "image_url_2" in job_input:
-        image2_path = process_input(job_input["image_url_2"], task_id, "input_image_2.jpg", "url")
-    elif "image_base64_2" in job_input:
-        image2_path = process_input(job_input["image_base64_2"], task_id, "input_image_2.jpg", "base64")
+    num_images = len(image_paths)
+    if num_images == 0:
+        return {"error": "최소 1개의 이미지 입력이 필요합니다. (image_path / image_url / image_base64 중 하나)"}
 
-    if image2_path:
-        workflow_path = "/qwen_image_edit_2.json"
-    else:
-        workflow_path = "/qwen_image_edit_1.json"
+    if num_images not in _WORKFLOW_FILES:
+        return {"error": f"지원하는 이미지 개수는 1, 2, 3개입니다. 입력된 이미지: {num_images}개"}
+
+    workflow_filename = _WORKFLOW_FILES[num_images]
+    workflow_path = os.path.join(_WORKFLOW_BASE, workflow_filename)
+    if not os.path.exists(workflow_path):
+        return {"error": f"워크플로우 파일을 찾을 수 없습니다: {workflow_path}"}
 
     prompt = load_workflow(workflow_path)
 
-    prompt["78"]["inputs"]["image"] = image1_path
-    if image2_path:
-        prompt["123"]["inputs"]["image"] = image2_path
+    # 노드 번호는 각 워크플로우 JSON과 동일하게 사용
+    prompt[_NODE_IMAGE_1]["inputs"]["image"] = image_paths[0]
+    if num_images >= 2:
+        prompt[_NODE_IMAGE_2]["inputs"]["image"] = image_paths[1]
+    if num_images >= 3:
+        prompt[_NODE_IMAGE_3]["inputs"]["image"] = image_paths[2]
 
-    prompt["111"]["inputs"]["prompt"] = job_input["prompt"]
-
-
-    prompt["3"]["inputs"]["seed"] = job_input["seed"]
-    prompt["128"]["inputs"]["value"] = job_input["width"]
-    prompt["129"]["inputs"]["value"] = job_input["height"]
+    prompt[_NODE_PROMPT]["inputs"]["prompt"] = job_input.get("prompt", "")
+    if _NODE_SEED in prompt and "seed" in job_input:
+        prompt[_NODE_SEED]["inputs"]["seed"] = job_input["seed"]
+    if _NODE_WIDTH in prompt and "width" in job_input:
+        prompt[_NODE_WIDTH]["inputs"]["value"] = job_input["width"]
+    if _NODE_HEIGHT in prompt and "height" in job_input:
+        prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
