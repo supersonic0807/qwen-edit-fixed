@@ -265,16 +265,23 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Set dynamic megapixels for ImageScaleToTotalPixels node (node 93)
-    # This preserves image quality by processing at the requested resolution
-    # instead of downscaling to 1MP (hardcoded default)
+    # Replace ImageScaleToTotalPixels with ImageScale for exact dimensions
+    # This ensures output matches requested width/height exactly
+    # instead of approximating based on megapixels
     width = job_input.get("width", 1024)
     height = job_input.get("height", 1024)
-    megapixels = (width * height) / 1000000.0
     
     if _NODE_SCALE in prompt:
-        prompt[_NODE_SCALE]["inputs"]["megapixels"] = megapixels
-        logger.info(f"✅ Set node 93 megapixels to {megapixels:.2f} (target: {width}x{height})")
+        # Replace with ImageScale node that supports exact dimensions
+        prompt[_NODE_SCALE]["class_type"] = "ImageScale"
+        prompt[_NODE_SCALE]["inputs"] = {
+            "upscale_method": "lanczos",
+            "width": width,
+            "height": height,
+            "crop": "disabled",
+            "image": prompt[_NODE_SCALE]["inputs"]["image"]  # Preserve input connection
+        }
+        logger.info(f"✅ Set node 93 to exact dimensions: {width}x{height}")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
