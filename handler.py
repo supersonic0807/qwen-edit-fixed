@@ -152,6 +152,7 @@ _NODE_SEED = "3"
 _NODE_PROMPT = "111"
 _NODE_WIDTH = "128"   # 현재 워크플로우에는 없음(선택 적용)
 _NODE_HEIGHT = "129"  # 현재 워크플로우에는 없음(선택 적용)
+_NODE_SCALE = "93"    # ImageScaleToTotalPixels 노드 (megapixels 동적 설정)
 
 # ------------------------------
 # 입력 처리 유틸 (path/url/base64)
@@ -263,6 +264,17 @@ def handler(job):
         prompt[_NODE_WIDTH]["inputs"]["value"] = job_input["width"]
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
+
+    # Set dynamic megapixels for ImageScaleToTotalPixels node (node 93)
+    # This preserves image quality by processing at the requested resolution
+    # instead of downscaling to 1MP (hardcoded default)
+    width = job_input.get("width", 1024)
+    height = job_input.get("height", 1024)
+    megapixels = (width * height) / 1000000.0
+    
+    if _NODE_SCALE in prompt:
+        prompt[_NODE_SCALE]["inputs"]["megapixels"] = megapixels
+        logger.info(f"✅ Set node 93 megapixels to {megapixels:.2f} (target: {width}x{height})")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
