@@ -275,8 +275,8 @@ def handler(job):
 
     # Two-stage pipeline: Model processes at native 1MP, then Real-ESRGAN upscales to target
     # Node 93 stays at megapixels=1 (no zoom-out), Node 122/132 handles upscale to target
-    width_raw = job_input.get("width", 1024)
-    height_raw = job_input.get("height", 1024)
+    width_raw = job_input.get("width", 1920)
+    height_raw = job_input.get("height", 1280)
     
     # Round to nearest multiple of 8 for VAE compatibility
     width = round(width_raw / 8) * 8
