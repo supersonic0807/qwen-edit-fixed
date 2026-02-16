@@ -265,23 +265,25 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Replace ImageScaleToTotalPixels with ImageScale for exact dimensions
-    # This ensures output matches requested width/height exactly
-    # instead of approximating based on megapixels
-    width = job_input.get("width", 1024)
-    height = job_input.get("height", 1024)
+    # Set dynamic megapixels for ImageScaleToTotalPixels (preserves original scaling behavior)
+    # Round to VAE-compatible dimensions (multiple of 8) to prevent zoom-out
+    width_raw = job_input.get("width", 1024)
+    height_raw = job_input.get("height", 1024)
+    
+    # Round to nearest multiple of 8 for VAE compatibility
+    width = round(width_raw / 8) * 8
+    height = round(height_raw / 8) * 8
+    
+    # Calculate megapixels from VAE-compatible dimensions
+    megapixels = (width * height) / 1000000.0
+    
+    logger.info(f"📐 VAE dimension adjustment: {width_raw}x{height_raw} → {width}x{height} ({megapixels:.2f}MP)")
     
     if _NODE_SCALE in prompt:
-        # Replace with ImageScale node that supports exact dimensions
-        prompt[_NODE_SCALE]["class_type"] = "ImageScale"
-        prompt[_NODE_SCALE]["inputs"] = {
-            "upscale_method": "lanczos",
-            "width": width,
-            "height": height,
-            "crop": "disabled",
-            "image": prompt[_NODE_SCALE]["inputs"]["image"]  # Preserve input connection
-        }
-        logger.info(f"✅ Set node 93 to exact dimensions: {width}x{height}")
+        # Keep original ImageScaleToTotalPixels - just update megapixels
+        # This preserves the aspect-ratio-friendly scaling that doesn't zoom out
+        prompt[_NODE_SCALE]["inputs"]["megapixels"] = megapixels
+        logger.info(f"✅ Set node 93 megapixels to {megapixels:.2f} (target: {width}x{height})")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
