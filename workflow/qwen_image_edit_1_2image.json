@@ -47,7 +47,7 @@
   },
   "37": {
     "inputs": {
-      "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+      "unet_name": "qwen_image_2512_fp8_e4m3fn_scaled_comfyui_4steps_v1.0.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -141,7 +141,7 @@
   },
   "89": {
     "inputs": {
-      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "lora_name": "Qwen-Image-2512-Lightning-4steps-V1.0-bf16.safetensors",
       "strength_model": 1,
       "model": [
         "37",
