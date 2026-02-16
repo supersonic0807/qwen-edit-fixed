@@ -1,11 +1,12 @@
 # Build Info
 
-Last updated: 2026-02-13 14:42
+Last updated: 2026-02-16 14:47
 
 ## Changes
-- Modified handler.py to use ImageScale with exact dimensions instead of ImageScaleToTotalPixels
-- Ensures output matches requested width/height exactly (e.g., 2500x1667)
-- Prevents image extension and quality loss
+- Reverted to ImageScaleToTotalPixels with dynamic megapixels
+- Added VAE dimension rounding (ensures multiple of 8)
+- Fixes zoom-out issue while preserving quality
+- Target: 2496x1664 output (~4.15MP) instead of 1MP
 
 ## Build Status
-- Forcing fresh build attempt
+- Triggering fresh build attempt
