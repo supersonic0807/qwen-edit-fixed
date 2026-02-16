@@ -276,7 +276,7 @@
   },
   "130": {
     "inputs": {
-      "model_name": "RealESRGAN_x4plus.pth"
+      "model_name": "realesr-general-x4v3.pth"
     },
     "class_type": "UpscaleModelLoader",
     "_meta": {
