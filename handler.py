@@ -265,8 +265,8 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Set dynamic megapixels for ImageScaleToTotalPixels (preserves original scaling behavior)
-    # Round to VAE-compatible dimensions (multiple of 8) to prevent zoom-out
+    # Switch to exact width/height scaling to eliminate zoom-out
+    # Keep megapixels at 1 to preserve original composition, change node type to ImageScale
     width_raw = job_input.get("width", 1024)
     height_raw = job_input.get("height", 1024)
     
@@ -274,16 +274,19 @@ def handler(job):
     width = round(width_raw / 8) * 8
     height = round(height_raw / 8) * 8
     
-    # Calculate megapixels from VAE-compatible dimensions
-    megapixels = (width * height) / 1000000.0
-    
-    logger.info(f"📐 VAE dimension adjustment: {width_raw}x{height_raw} → {width}x{height} ({megapixels:.2f}MP)")
+    logger.info(f"📐 VAE dimension adjustment: {width_raw}x{height_raw} → {width}x{height}")
     
     if _NODE_SCALE in prompt:
-        # Keep original ImageScaleToTotalPixels - just update megapixels
-        # This preserves the aspect-ratio-friendly scaling that doesn't zoom out
-        prompt[_NODE_SCALE]["inputs"]["megapixels"] = megapixels
-        logger.info(f"✅ Set node 93 megapixels to {megapixels:.2f} (target: {width}x{height})")
+        # Change to ImageScale with exact dimensions to preserve composition
+        prompt[_NODE_SCALE]["class_type"] = "ImageScale"
+        prompt[_NODE_SCALE]["inputs"] = {
+            "upscale_method": "lanczos",
+            "width": width,
+            "height": height,
+            "crop": "center",
+            "image": prompt[_NODE_SCALE]["inputs"]["image"]
+        }
+        logger.info(f"✅ Set node 93 to ImageScale with exact dimensions: {width}x{height}")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
