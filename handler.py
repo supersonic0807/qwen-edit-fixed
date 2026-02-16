@@ -273,8 +273,8 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Two-stage pipeline: Model processes at native 1MP, then Real-ESRGAN upscales to target
-    # Node 93 stays at megapixels=1 (no zoom-out), Node 122/132 handles upscale to target
+    # Simple pipeline: Model processes at native 1MP, then Lanczos upscales to target
+    # Node 93 stays at megapixels=1 (no zoom-out), Node 122/132 handles Lanczos upscale to target
     width_raw = job_input.get("width", 1920)
     height_raw = job_input.get("height", 1280)
     

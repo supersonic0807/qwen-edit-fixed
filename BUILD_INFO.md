@@ -1,35 +1,35 @@
 # Build Info
 
-Last updated: 2026-02-16 17:00
+Last updated: 2026-02-16 18:30
 
-## MAJOR FIX: Two-Stage Pipeline with Real-ESRGAN
+## MAJOR FIX: Pure Lanczos Upscaling (Option B)
 
 ### Root Cause Identified
 - Qwen model trained at ~1MP resolution
-- Forcing 4.15MP output causes model to "zoom out" to fill canvas
-- Original 1248×832 output has no zoom-out, but loses quality
+- Forcing higher output causes model to "zoom out" to fill canvas
+- AI upscalers (Real-ESRGAN) caused over-sharpening/smoothing artifacts
 
-### Solution: Two-Stage Pipeline
+### Solution: Simple Lanczos Pipeline
 ```
-Input (2496×1664) 
+Input (1920×1280) 
     ↓ [Scale to 1MP: ~1248×832]
-Qwen 2512 Model (1MP) ← native resolution, NO zoom-out
+Qwen Edit 2511 Model (1MP) ← native resolution, NO zoom-out
     ↓ VAEDecode (1MP)
-    ↓ Real-ESRGAN 4x upscale (~4992×3328)
-    ↓ ImageScale to target (2496×1664)
-Output (2496×1664) ← sharp, full quality, NO zoom-out
+    ↓ Lanczos upscale to 1920×1280 (~2.4× factor)
+Output (1920×1280) ← natural quality, NO zoom-out, NO artifacts
 ```
 
 ### Changes Made
-- **Dockerfile**: Added Real-ESRGAN_x4plus.pth (64MB)
-- **Workflows**: Added upscaler pipeline (nodes 120-122, or 130-132 for 3-image)
-- **Handler**: Sets dynamic target dimensions for upscaler output
+- **Dockerfile**: Removed Real-ESRGAN download (cleaner build)
+- **Workflows**: Removed AI upscaler nodes, direct Lanczos scaling
+- **Handler**: Sets dynamic target dimensions (default 1920×1280)
+- **Models**: Using Qwen Edit 2511 (image editing, not generation 2512)
 
 ### Expected Results
 - ✅ No zoom-out (model stays at native 1MP)
-- ✅ Full resolution output (2496×1664)
-- ✅ Sharp quality (Real-ESRGAN AI upscaling)
-- ✅ ~3-5 seconds extra processing time
+- ✅ 1920×1280 output (true 1080p quality)
+- ✅ Natural quality (pure geometric upscale, no AI artifacts)
+- ✅ Fast processing (no AI upscaler overhead)
 
 ## Build Status
-- Deploying two-stage pipeline with Real-ESRGAN
+- Deploying pure Lanczos pipeline with 1920×1280 target

@@ -274,31 +274,6 @@
       "title": "ImageScaleToTotalPixels"
     }
   },
-  "130": {
-    "inputs": {
-      "model_name": "realesr-general-x4v3.pth"
-    },
-    "class_type": "UpscaleModelLoader",
-    "_meta": {
-      "title": "Load Upscale Model"
-    }
-  },
-  "131": {
-    "inputs": {
-      "upscale_model": [
-        "130",
-        0
-      ],
-      "image": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "ImageUpscaleWithModel",
-    "_meta": {
-      "title": "Upscale Image (Using Model)"
-    }
-  },
   "132": {
     "inputs": {
       "upscale_method": "lanczos",
@@ -306,7 +281,7 @@
       "height": 1280,
       "crop": "disabled",
       "image": [
-        "131",
+        "8",
         0
       ]
     },
