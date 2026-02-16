@@ -79,7 +79,7 @@
     "inputs": {
       "filename_prefix": "ComfyUI",
       "images": [
-        "8",
+        "132",
         0
       ]
     },
@@ -272,6 +272,47 @@
     "class_type": "ImageScaleToTotalPixels",
     "_meta": {
       "title": "ImageScaleToTotalPixels"
+    }
+  },
+  "130": {
+    "inputs": {
+      "model_name": "RealESRGAN_x4plus.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "131": {
+    "inputs": {
+      "upscale_model": [
+        "130",
+        0
+      ],
+      "image": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ImageUpscaleWithModel",
+    "_meta": {
+      "title": "Upscale Image (Using Model)"
+    }
+  },
+  "132": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "width": 2496,
+      "height": 1664,
+      "crop": "disabled",
+      "image": [
+        "131",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Scale to Target"
     }
   }
 }

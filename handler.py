@@ -152,7 +152,15 @@ _NODE_SEED = "3"
 _NODE_PROMPT = "111"
 _NODE_WIDTH = "128"   # 현재 워크플로우에는 없음(선택 적용)
 _NODE_HEIGHT = "129"  # 현재 워크플로우에는 없음(선택 적용)
-_NODE_SCALE = "93"    # ImageScaleToTotalPixels 노드 (megapixels 동적 설정)
+_NODE_SCALE = "93"    # ImageScaleToTotalPixels 노드 (megapixels=1 고정)
+
+# Upscaler output nodes (Real-ESRGAN → ImageScale to target dimensions)
+# Different node IDs due to existing nodes in 3-image workflow
+_NODE_UPSCALE_OUTPUT = {
+    1: "122",  # 1-image workflow
+    2: "122",  # 2-image workflow
+    3: "132",  # 3-image workflow (119, 120 already used)
+}
 
 # ------------------------------
 # 입력 처리 유틸 (path/url/base64)
@@ -265,8 +273,8 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Switch to exact width/height scaling to eliminate zoom-out
-    # Keep megapixels at 1 to preserve original composition, change node type to ImageScale
+    # Two-stage pipeline: Model processes at native 1MP, then Real-ESRGAN upscales to target
+    # Node 93 stays at megapixels=1 (no zoom-out), Node 122/132 handles upscale to target
     width_raw = job_input.get("width", 1024)
     height_raw = job_input.get("height", 1024)
     
@@ -274,19 +282,14 @@ def handler(job):
     width = round(width_raw / 8) * 8
     height = round(height_raw / 8) * 8
     
-    logger.info(f"📐 VAE dimension adjustment: {width_raw}x{height_raw} → {width}x{height}")
+    logger.info(f"📐 Two-stage pipeline: Input {width_raw}x{height_raw} → Model 1MP → Upscale {width}x{height}")
     
-    if _NODE_SCALE in prompt:
-        # Change to ImageScale with exact dimensions to preserve composition
-        prompt[_NODE_SCALE]["class_type"] = "ImageScale"
-        prompt[_NODE_SCALE]["inputs"] = {
-            "upscale_method": "lanczos",
-            "width": width,
-            "height": height,
-            "crop": "center",
-            "image": prompt[_NODE_SCALE]["inputs"]["image"]
-        }
-        logger.info(f"✅ Set node 93 to ImageScale with exact dimensions: {width}x{height}")
+    # Set upscaler output dimensions (Real-ESRGAN + ImageScale to target)
+    upscale_node = _NODE_UPSCALE_OUTPUT.get(num_images, "122")
+    if upscale_node in prompt:
+        prompt[upscale_node]["inputs"]["width"] = width
+        prompt[upscale_node]["inputs"]["height"] = height
+        logger.info(f"✅ Set node {upscale_node} upscaler output to: {width}x{height}")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")

@@ -1,26 +1,35 @@
 # Build Info
 
-Last updated: 2026-02-16 16:30
+Last updated: 2026-02-16 17:00
 
-## Major Upgrade: Qwen 2512 Models
+## MAJOR FIX: Two-Stage Pipeline with Real-ESRGAN
 
-### Model Changes
-- **Diffusion**: 2511 → 2512 (qwen_image_2512_fp8_e4m3fn_scaled_comfyui_4steps_v1.0)
-- **LoRA**: 2511-Lightning → 2512-Lightning (4steps V1.0 bf16)
-- **Source**: lightx2v/Qwen-Image-2512-Lightning (official ComfyUI optimized)
+### Root Cause Identified
+- Qwen model trained at ~1MP resolution
+- Forcing 4.15MP output causes model to "zoom out" to fill canvas
+- Original 1248×832 output has no zoom-out, but loses quality
 
-### Expected Improvements (per official release notes)
-- **Enhanced Human Realism**: Reduce "AI-generated" look
-- **Finer Natural Details**: Better landscapes, textures, fur
-- **Improved Text Rendering**: Better accuracy and layout
-- **Better Composition**: Should handle zoom-out issue better
+### Solution: Two-Stage Pipeline
+```
+Input (2496×1664) 
+    ↓ [Scale to 1MP: ~1248×832]
+Qwen 2512 Model (1MP) ← native resolution, NO zoom-out
+    ↓ VAEDecode (1MP)
+    ↓ Real-ESRGAN 4x upscale (~4992×3328)
+    ↓ ImageScale to target (2496×1664)
+Output (2496×1664) ← sharp, full quality, NO zoom-out
+```
 
-### Technical Details
-- **ImageScale**: Exact dimensions (2496×1664) with center crop
-- **VAE Compatibility**: Dimensions rounded to multiple of 8
-- **Quality**: Full resolution preservation
-- **Same Workflow**: Drop-in replacement, same node structure
+### Changes Made
+- **Dockerfile**: Added Real-ESRGAN_x4plus.pth (64MB)
+- **Workflows**: Added upscaler pipeline (nodes 120-122, or 130-132 for 3-image)
+- **Handler**: Sets dynamic target dimensions for upscaler output
+
+### Expected Results
+- ✅ No zoom-out (model stays at native 1MP)
+- ✅ Full resolution output (2496×1664)
+- ✅ Sharp quality (Real-ESRGAN AI upscaling)
+- ✅ ~3-5 seconds extra processing time
 
 ## Build Status
-- Upgrading to Qwen 2512 generation
-- Testing zoom-out fix + quality improvements
+- Deploying two-stage pipeline with Real-ESRGAN

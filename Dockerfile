@@ -30,6 +30,9 @@ RUN wget -q https://huggingface.co/lightx2v/Qwen-Image-2512-Lightning/resolve/ma
 RUN wget -q https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors -O /ComfyUI/models/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors 
 RUN wget -q https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors -O /ComfyUI/models/vae/qwen_image_vae.safetensors
 
+# Download Real-ESRGAN upscaler model for post-processing upscale (64MB)
+RUN wget -q https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -O /ComfyUI/models/upscale_models/RealESRGAN_x4plus.pth
+
 COPY . .
 RUN chmod +x /entrypoint.sh
 
