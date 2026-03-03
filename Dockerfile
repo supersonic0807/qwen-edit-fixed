@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U "huggingface_hub[hf_transfer]"
 RUN pip install runpod websocket-client librosa
+RUN pip install realesrgan basicsr
 
 # Set working directory
 WORKDIR /
@@ -31,6 +32,13 @@ RUN wget -q https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/spl
 RUN wget -q https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors -O /ComfyUI/models/vae/qwen_image_vae.safetensors
 
 COPY . .
+
+# Download Real-ESRGAN model weights (not stored in git — too large)
+# RealESRGAN_x2plus: 2× upscaler used for post-processing Qwen output to 2496×1664
+RUN mkdir -p /real-esrgan/models/realesrgan && \
+    wget -q https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth \
+         -O /real-esrgan/models/realesrgan/RealESRGAN_x2plus.pth
+
 RUN chmod +x /entrypoint.sh
 
 CMD ["/entrypoint.sh"]

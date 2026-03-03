@@ -1,0 +1,8 @@
+# Model weights — downloaded at Docker build time, never committed to git
+*.pth
+*.pth.tar
+*.safetensors
+*.bin
+
+# Keep directory structure
+!.gitignore

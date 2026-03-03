@@ -1,0 +1,10 @@
+# Real-ESRGAN Real Estate Enhancement - Requirements
+# Install with:  pip install -r realesrgan_requirements.txt
+
+torch>=1.13
+torchvision>=0.14
+numpy
+opencv-python
+realesrgan
+basicsr>=1.4.2
+gfpgan          # optional – only needed for --face-enhance

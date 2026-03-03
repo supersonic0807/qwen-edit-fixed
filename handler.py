@@ -12,6 +12,11 @@ import binascii # Base64 에러 처리를 위해 import
 import subprocess
 import time
 
+# Real-ESRGAN post-processing
+# Loaded once at module import so the model is ready before the first job arrives.
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'real-esrgan'))
+from realesrgan_enhance import enhance_bytes as _esrgan_enhance
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -273,23 +278,19 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Simple pipeline: Model processes at native 1MP, then Lanczos upscales to target
-    # Node 93 stays at megapixels=1 (no zoom-out), Node 122/132 handles Lanczos upscale to target
-    width_raw = job_input.get("width", 1920)
-    height_raw = job_input.get("height", 1280)
-    
-    # Round to nearest multiple of 8 for VAE compatibility
-    width = round(width_raw / 8) * 8
-    height = round(height_raw / 8) * 8
-    
-    logger.info(f"📐 Two-stage pipeline: Input {width_raw}x{height_raw} → Model 1MP → Upscale {width}x{height}")
-    
-    # Set upscaler output dimensions (Real-ESRGAN + ImageScale to target)
+    # Two-stage pipeline:
+    #   Stage 1 — ComfyUI/Qwen at ~1MP (node 93), Lanczos to 1248x832 (node 122/132).
+    #   Stage 2 — Real-ESRGAN x2 in this handler delivers final 2496x1664 output.
+    # 1248x832 is near-native Qwen resolution so ESRGAN does all the real upscaling
+    # from learned detail rather than from a pre-stretched Lanczos image.
+    ESRGAN_INTERMEDIATE_W = 1248
+    ESRGAN_INTERMEDIATE_H = 832
+
     upscale_node = _NODE_UPSCALE_OUTPUT.get(num_images, "122")
     if upscale_node in prompt:
-        prompt[upscale_node]["inputs"]["width"] = width
-        prompt[upscale_node]["inputs"]["height"] = height
-        logger.info(f"✅ Set node {upscale_node} upscaler output to: {width}x{height}")
+        prompt[upscale_node]["inputs"]["width"] = ESRGAN_INTERMEDIATE_W
+        prompt[upscale_node]["inputs"]["height"] = ESRGAN_INTERMEDIATE_H
+        logger.info(f"✅ Node {upscale_node} set to {ESRGAN_INTERMEDIATE_W}x{ESRGAN_INTERMEDIATE_H} (ESRGAN x2 will deliver 2496x1664)")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
@@ -332,11 +333,21 @@ def handler(job):
     if not images:
         return {"error": "이미지를 생성할 수 없습니다."}
     
-    # 첫 번째 이미지 반환
+    # Apply Real-ESRGAN x2 enhancement then return
     for node_id in images:
         if images[node_id]:
-            return {"image": images[node_id][0]}
-    
+            raw_b64 = images[node_id][0]
+            logger.info("🔬 Running Real-ESRGAN x2 enhancement (1248x832 -> 2496x1664)...")
+            try:
+                raw_bytes = base64.b64decode(raw_b64)
+                enhanced_bytes = _esrgan_enhance(raw_bytes, outscale=2)
+                enhanced_b64 = base64.b64encode(enhanced_bytes).decode('utf-8')
+                logger.info(f"✅ ESRGAN complete: {len(enhanced_bytes) // 1024}KB output")
+                return {"image": enhanced_b64}
+            except Exception as e:
+                logger.error(f"❌ ESRGAN failed, returning raw ComfyUI output: {e}")
+                return {"image": raw_b64}
+
     return {"error": "이미지를 찾을 수 없습니다."}
 
 runpod.serverless.start({"handler": handler})
