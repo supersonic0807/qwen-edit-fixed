@@ -6,7 +6,10 @@ RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U "huggingface_hub[hf_transfer]"
 RUN pip install runpod websocket-client librosa
-RUN pip install realesrgan basicsr
+# BASICSR_EXT=False skips CUDA C++ extension compilation (only needed for training,
+# not inference). Without this flag pip install basicsr takes 20+ minutes and
+# exceeds the 30-minute build timeout.
+RUN BASICSR_EXT=False pip install --no-cache-dir basicsr realesrgan
 
 # Set working directory
 WORKDIR /
