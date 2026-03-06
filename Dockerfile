@@ -5,7 +5,7 @@ FROM wlsdml1114/multitalk-base:1.7 as runtime
 RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
 RUN pip install -U "huggingface_hub[hf_transfer]"
-RUN pip install runpod websocket-client librosa
+RUN pip install runpod websocket-client librosa Pillow
 # BASICSR_EXT=False skips CUDA C++ extension compilation (only needed for training,
 # not inference). Without this flag pip install basicsr takes 20+ minutes and
 # exceeds the 30-minute build timeout.

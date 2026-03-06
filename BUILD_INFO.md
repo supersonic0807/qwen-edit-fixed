@@ -1,8 +1,46 @@
 # Build Info
 
-Last updated: 2026-02-16 18:30
+Last updated: 2026-03-06
 
-## MAJOR FIX: Pure Lanczos Upscaling (Option B)
+## LATEST: Aspect Ratio Preservation (Portrait Fix)
+
+### Problem Solved
+- **Issue**: Portrait images (e.g., 1280×1920) were squashed when forced into landscape dimensions (1248×832)
+- **Root Cause**: Hardcoded intermediate dimensions assumed landscape orientation
+- **Impact**: Portrait photos had distorted aspect ratios in final output
+
+### Solution: Dynamic Aspect Ratio Detection
+```
+Input Image (any aspect ratio)
+    ↓ [Detect dimensions & aspect ratio]
+    ↓ [Calculate ~1MP intermediate preserving ratio]
+Qwen Edit 2511 Model (1MP)
+    ↓ VAEDecode
+    ↓ Lanczos to intermediate size (aspect ratio preserved)
+    ↓ Real-ESRGAN x2 enhancement
+Output (2× intermediate, correct aspect ratio)
+```
+
+### Examples
+- **Landscape** (1920×1280): 1248×832 → 2496×1664 ✅
+- **Portrait** (1280×1920): 832×1248 → 1664×2496 ✅ (FIXED!)
+- **Square** (2048×2048): 1024×1024 → 2048×2048 ✅
+- **Ultrawide** (2560×1080): 1520×632 → 3040×1264 ✅
+
+### Implementation Details
+- Auto-detects orientation from first input image
+- Calculates intermediate dimensions maintaining aspect ratio at ~1MP
+- Rounds to multiples of 8 (VAE requirement)
+- ESRGAN applies 2× scaling to correct dimensions
+- No API changes required - fully automatic
+
+### Changes Made
+- **handler.py**: Dynamic dimension calculation based on input aspect ratio
+- **Dockerfile**: Added Pillow dependency for image dimension detection
+
+---
+
+## PREVIOUS FIX: Pure Lanczos Upscaling (Option B)
 
 ### Root Cause Identified
 - Qwen model trained at ~1MP resolution

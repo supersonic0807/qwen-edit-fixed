@@ -11,6 +11,7 @@ import urllib.parse
 import binascii # Base64 에러 처리를 위해 import
 import subprocess
 import time
+from PIL import Image
 
 # Real-ESRGAN post-processing
 # Loaded once at module import so the model is ready before the first job arrives.
@@ -278,19 +279,61 @@ def handler(job):
     if _NODE_HEIGHT in prompt and "height" in job_input:
         prompt[_NODE_HEIGHT]["inputs"]["value"] = job_input["height"]
 
-    # Two-stage pipeline:
-    #   Stage 1 — ComfyUI/Qwen at ~1MP (node 93), Lanczos to 1248x832 (node 122/132).
-    #   Stage 2 — Real-ESRGAN x2 in this handler delivers final 2496x1664 output.
-    # 1248x832 is near-native Qwen resolution so ESRGAN does all the real upscaling
-    # from learned detail rather than from a pre-stretched Lanczos image.
-    ESRGAN_INTERMEDIATE_W = 1248
-    ESRGAN_INTERMEDIATE_H = 832
+    # Two-stage pipeline with aspect ratio preservation:
+    #   Stage 1 — ComfyUI/Qwen at ~1MP (node 93), Lanczos to intermediate size
+    #   Stage 2 — Real-ESRGAN x2 in this handler delivers final output
+    # Intermediate dimensions preserve input aspect ratio to prevent squashing
+    
+    # Detect input image dimensions and aspect ratio
+    try:
+        with Image.open(image_paths[0]) as img:
+            input_width, input_height = img.size
+        logger.info(f"📐 Input image dimensions: {input_width}×{input_height}")
+    except Exception as e:
+        logger.error(f"❌ Failed to load image for dimension detection: {e}")
+        return {"error": f"이미지 로드 실패: {e}"}
+    
+    # Calculate aspect ratio
+    aspect_ratio = input_width / input_height
+    is_portrait = input_height > input_width
+    is_square = 0.9 < aspect_ratio < 1.1
+    
+    # Calculate intermediate dimensions at ~1MP while preserving aspect ratio
+    target_megapixels = 1_000_000
+    
+    if is_square:
+        # Square-ish images
+        intermediate_w = int(target_megapixels ** 0.5)
+        intermediate_h = intermediate_w
+        orientation = "square"
+    elif is_portrait:
+        # Portrait (height > width)
+        intermediate_h = int((target_megapixels / aspect_ratio) ** 0.5)
+        intermediate_w = int(intermediate_h * aspect_ratio)
+        orientation = "portrait"
+    else:
+        # Landscape (width > height)
+        intermediate_w = int((target_megapixels * aspect_ratio) ** 0.5)
+        intermediate_h = int(intermediate_w / aspect_ratio)
+        orientation = "landscape"
+    
+    # Round to multiples of 8 (required by VAE)
+    intermediate_w = (intermediate_w // 8) * 8
+    intermediate_h = (intermediate_h // 8) * 8
+    
+    # Calculate final output dimensions (ESRGAN x2)
+    final_w = intermediate_w * 2
+    final_h = intermediate_h * 2
+    
+    logger.info(f"🎯 Detected {orientation} orientation (aspect {aspect_ratio:.2f})")
+    logger.info(f"📏 Intermediate: {intermediate_w}×{intermediate_h} (~{(intermediate_w*intermediate_h)/1_000_000:.2f}MP)")
+    logger.info(f"🎨 Final output: {final_w}×{final_h} (ESRGAN x2)")
 
     upscale_node = _NODE_UPSCALE_OUTPUT.get(num_images, "122")
     if upscale_node in prompt:
-        prompt[upscale_node]["inputs"]["width"] = ESRGAN_INTERMEDIATE_W
-        prompt[upscale_node]["inputs"]["height"] = ESRGAN_INTERMEDIATE_H
-        logger.info(f"✅ Node {upscale_node} set to {ESRGAN_INTERMEDIATE_W}x{ESRGAN_INTERMEDIATE_H} (ESRGAN x2 will deliver 2496x1664)")
+        prompt[upscale_node]["inputs"]["width"] = intermediate_w
+        prompt[upscale_node]["inputs"]["height"] = intermediate_h
+        logger.info(f"✅ Node {upscale_node} set to {intermediate_w}×{intermediate_h} (ESRGAN x2 will deliver {final_w}×{final_h})")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
