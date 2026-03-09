@@ -284,13 +284,29 @@ def handler(job):
     #   Stage 2 — Real-ESRGAN x2 in this handler delivers final output
     # Intermediate dimensions preserve input aspect ratio to prevent squashing
     
-    # Detect input image dimensions and aspect ratio
+    # Detect input image dimensions and aspect ratio.
+    # CRITICAL: Apply EXIF auto-rotation first.
+    # Phone cameras save portrait photos as landscape pixels + EXIF orientation flag.
+    # Without this, portrait images are processed as landscape and appear squashed.
     try:
+        from PIL import ImageOps
+        for idx, img_path in enumerate(image_paths):
+            with Image.open(img_path) as img:
+                exif_orientation = img.getexif().get(0x0112, 1)  # Tag 274 = Orientation
+                corrected = ImageOps.exif_transpose(img)
+                if exif_orientation != 1:
+                    logger.info(f"📱 Image {idx+1}: EXIF orientation={exif_orientation} detected, auto-rotating")
+                    corrected.save(img_path)
+                    logger.info(f"✅ Image {idx+1}: Saved EXIF-corrected image to {img_path}")
+                else:
+                    logger.info(f"📐 Image {idx+1}: No EXIF rotation needed (orientation={exif_orientation})")
+
+        # Read corrected dimensions from first image
         with Image.open(image_paths[0]) as img:
             input_width, input_height = img.size
-        logger.info(f"📐 Input image dimensions: {input_width}×{input_height}")
+        logger.info(f"📐 Input image dimensions after EXIF correction: {input_width}×{input_height}")
     except Exception as e:
-        logger.error(f"❌ Failed to load image for dimension detection: {e}")
+        logger.error(f"❌ Failed during EXIF correction or dimension detection: {e}")
         return {"error": f"이미지 로드 실패: {e}"}
     
     # Calculate aspect ratio
